@@ -16,6 +16,9 @@ const rendererOptions = {
   },
   setElementText(el, text){
     el.textContent = text
+  },
+  createElement(tag){
+    return document.createElement(tag)
   }
 }
 
@@ -27,6 +30,16 @@ export function ensureRenderer(){
 // 创建createApp实例
 export function createApp(rootComponent) {
   // console.log(rootComponent)
-  const renderer = ensureRenderer()
-  return  renderer.createApp(rootComponent)
+  const app = ensureRenderer().createApp(rootComponent)
+  const mount = app.mount
+  app.mount = function (selectorOrContainer){
+    let container;
+    if(typeof selectorOrContainer === 'string'){
+      container = document.querySelector(selectorOrContainer)
+    }else{
+
+    }
+    mount(container)
+  }
+  return  app
 }

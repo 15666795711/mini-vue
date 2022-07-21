@@ -6,6 +6,7 @@ export function effect(fn){
   activeEffect = fn
 }
 
+// 实现reactive方法
 export function reactive(obj){
   return new Proxy(obj, {
     get(target, key){
