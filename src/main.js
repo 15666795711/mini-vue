@@ -6,13 +6,14 @@ import { createVNode } from './mini-vue/runtime-core/vnode.js'
 createApp({
   data(){
     return {
-      title: 'hello, mini-vue!',
-
+      // title: 'hello, mini-vue!',
+      title: ['hello, ', 'mini-vue!']
     }
   },
   mounted(){
     setTimeout(()=>{
-      this.title = 'wow, title change!'
+      this.title = ['wow, ', 'title change!','123123']
+      // this.title = 'wow, title change!'
     },2000)
   },
   render(){
@@ -21,6 +22,14 @@ createApp({
     // return h3
 
     // 虚拟dom
-    return createVNode('h3', {}, this.title)
+    if(Array.isArray(this.title)){
+      return createVNode(
+        'h3',
+        {},
+        this.title.map(t=>createVNode('p',{},t))
+      )
+    }else{
+      return createVNode('h3', {}, this.title)
+    }
   },
 }).mount('#app')

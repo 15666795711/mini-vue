@@ -9,7 +9,8 @@ export function createRenderer(options) {
   const {
     createElement: hostCreateElement,
     setElementText: hostSetElementText,
-    insert: hostInsert
+    insert: hostInsert,
+    removeChild: hostRemoveChild
   } = options
 
   // 对比两个vnode的变化，并作对应的处理
@@ -40,14 +41,15 @@ export function createRenderer(options) {
       // 创建阶段
       mountElement(n2, container)
     }else{
-
+      // 更新阶段
+      patchElement(n1, n2)
     }
   }
 
   const mountElement = (vnode, container)=> {
     // TODO 处理元素的属性
 
-    const el = vnode.el = hostCreateElement(vnode.type)
+    const el = (vnode.el = hostCreateElement(vnode.type))
     if(typeof vnode.children === 'string'){
       // 没有子节点，需要执行创建dom操作
       hostSetElementText(el, vnode.children)
@@ -58,6 +60,60 @@ export function createRenderer(options) {
 
     // 把处理完的组件挂载到根结点
     hostInsert(el, container)
+  }
+
+  const patchElement = (n1, n2) => {
+    // 取出当前的元素节点
+    const el = n2.el = n1.el
+    // 变化前后类型相同，说明是内容变化
+    if(n1.type === n2.type){
+      const oldChild = n1.children
+      const newChild = n2.children
+      if(typeof oldChild === 'string'){
+        if(typeof newChild === 'string'){
+          // 字符串 -> 字符串，如果值改变则更新
+          if(oldChild !== newChild){
+            hostSetElementText(el, newChild)
+          }
+        }else{
+          // 字符串 -> 子元素
+          // 先清空原来的内容
+          hostSetElementText(el, '')
+          // 将新的内容遍历插入容器
+          newChild.forEach(child => patch(null, child, el))
+        }
+      }else{
+        if(typeof newChild === 'string'){
+          // 子元素 -> 字符串
+          // 清空原来的内容并插入新的字符串
+          hostSetElementText(el, newChild)
+        }else{
+          // 子元素 -> 子元素
+          // 双端diff算法
+          updateChildren(oldChild, newChild, el)
+        }
+      }
+    }else{
+
+    }
+  }
+  // version1.0 - 双端diff算法 - 暴力计算
+  const updateChildren = (oldChild, newChild, parentElem) => {
+    // A B C D E
+    // A C D E
+    // 取出较短的长度
+    const len = Math.min(oldChild.length, newChild.length)
+    for (let i = 0; i < len; i++) {
+      patch(oldChild[i],newChild[i])      
+    }
+    // 处理剩余的部分
+    if(oldChild.length > newChild.length){
+      // 删除
+      oldChild.slice(len).forEach(child => hostRemoveChild(child.el)) 
+    }else{
+      // 追加
+      newChild.slice(len).forEach(child => patch(null, child, parentElem))
+    }
   }
 
   const patchComponent = (n1,n2,container)=>{}
@@ -87,28 +143,34 @@ export function createRenderer(options) {
   const setupRenderEffect = (instance, container) => {
     // 声明组件更新函数
     const updateComponentFn = () => {
+      // 获取组件渲染函数render
+      const {render} = instance.vnode.type
       if(!instance.isMounted){
         // 首次挂载
         instance.isMounted = true
-        // 获取组件渲染函数render
-        const {render} = instance.vnode.type
-        // 执行render
-        const vnode = render.call(instance.data)
+        // 执行render获取vnode，并保存供以后patch使用
+        const vnode = (instance.subTree = render.call(instance.data))
         // 递归patch
         patch(null, vnode, container)
+        // 挂载生命周期钩子
+        if(instance.vnode.type.mounted){
+          instance.vnode.type.mounted.call(instance.data)
+        }
       }else{
         // patch
-        
+        // 获取上一次的vnode
+        const prevVNode = instance.subTree
+        // 获取当前的vnode
+        const nextVNode = render.call(instance.data)
+        // 保存当前vnode供以后patch使用
+        instance.subTree = nextVNode
+        patch(prevVNode, nextVNode)
       }
     }
     // 建立更新机制
     effect(updateComponentFn)
     // 首次执行更新函数
     updateComponentFn()
-    // 挂载生命周期钩子
-    if(instance.vnode.type.mounted){
-      instance.vnode.type.mounted.call(instance.data)
-    }
   }
 
 
